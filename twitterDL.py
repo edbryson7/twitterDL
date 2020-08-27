@@ -1,44 +1,53 @@
 import twitKeys as tk
 import tweepy
 import time
+import re
 
 
 def main():
     auth = tweepy.OAuthHandler(tk.API_KEY, tk.API_SECRET)
     api = tweepy.API(auth)
 
+    tweetAuthorRE = re.compile(r'\'([\d\w]+)\'')
+    tweetLinkRE = re.compile(r'.*(https://t.co/[\w\d]*)')
 
     count = 0
     # This variable hold the username or the userid of the user you want to get favorites from
     # This needs to be the users unique username
     User = "@edzbrys"
-    # Cursor is the search method this search query will return 20 of the users latest favourites just like the php api you referenced
-    for favorite in tweepy.Cursor(api.favorites, id=User).items(20):
+    # Using cursor, return a generator of 1 million of the user's favorited tweets
+    for favorite in tweepy.Cursor(api.favorites, id=User).items(1000000):
+        # time variable used for delaying
         now = time.time()
-        # To get diffrent data from the tweet do "favourite" followed by the information you want the response is the same as the api you refrenced too
 
-        # Basic information about the user who created the tweet that was favorited
-        # Print the screen name of the tweets auther
-        print('\n\n\nTweet Author:'+str(favorite.user.screen_name.encode("utf-8")))
+        #counter for number of tweets processed
+        count += 1
+        print(f'\n\nNumber: {count}')
 
-        # Basic information about the tweet that was favorited
-        print('\nTweet:')
-        # Print the id of the tweet the user favorited
-        print('Tweet Id: '+str(favorite.id))
-        # Print the text of the tweet the user favorited
-        print('Tweet Text: '+str(favorite.text.encode("utf-8")))
-        # Encoding in utf-8 is a good practice when using data from twitter that users can submit (it avoids the program crashing because it can not encode characters like emojis)
+        # Regex searching of the tweet author and tweet link
+        authorRAW = str(favorite.user.screen_name.encode("utf-8"))
+        author = tweetAuthorRE.search(authorRAW)[1]
+        tweetText = str(favorite.text.encode("utf-8"))
+        tweetLink = tweetLinkRE.search(tweetText)[1]
 
+        tweetID = str(favorite.id)
+
+        # Prints tweet information
+        print(f'Author: {author}')
+        print(f'Id: {tweetID}')
+        print(f'Link: {tweetLink}')
+        print(
+            f'Date: {favorite.created_at.year}-{favorite.created_at.month}-{favorite.created_at.day}')
+
+        # Prints direct link of images within the tweet
         if 'media' in favorite.entities:
             for medium in favorite.extended_entities['media']:
-                if medium['type']=='photo':
-                    print(medium['media_url'])
+                if medium['type'] == 'photo':
+                    print('Tweet Image:', medium['media_url'])
 
-        count += 1
-        print(count)
-
-        # Sleep to avoid going over twitter API rate limit
+        # Delay to avoid going over twitter API rate limit
         while(time.time() - now <= 3):
             time.sleep(0.1)
 
-main()
+if __name__ == "__main__":
+    main()
