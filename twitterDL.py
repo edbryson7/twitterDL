@@ -23,9 +23,9 @@ def main():
     prevLoggedCount = 0
 
 
-    User = "@edzbrys"
+    User = tk.USER
     # Using cursor, return a generator of 1 million of the user's favorited tweets
-    for favorite in tweepy.Cursor(api.favorites, id=User).items(5): #1000000):
+    for favorite in tweepy.Cursor(api.favorites, id=User).items(15):
 
         # Counter for number of tweets processed
         tweetCount += 1
@@ -70,20 +70,27 @@ def main():
                     photos.append(medium['media_url'])
 
             # First see if the tweet is already in the excel log
-            if not search_log(tweetID):
-                prevLoggedCount += 1
-                write_log(tweetID, author, tweetDate, tweetLink, photos)
+            # if not search_log(tweetID):
+            prevLoggedCount += 1
+            write_log(sheet, tweetID, author, tweetDate, tweetLink, photos)
 
     wb.save('twitLog.xlsx')
     wb.close()
 
 
 # Function to populate the excel file with twitter data from new tweets
-def write_log(tweetID, author, tweetDate, tweetLink, photos):
-    pass
+def write_log(sheet, tweetID, author, tweetDate, tweetLink, photos):
+    for photo in photos:
+        sheet.insert_rows(1)
+        sheet['A1'] = tweetID
+        sheet['B1'] = author
+        sheet['C1'] = tweetDate
+        sheet['D1'] = '=HYPERLINK("{}", "{}")'.format(tweetLink, tweetLink)
+        sheet['E1'] = '=HYPERLINK("{}", "{}")'.format(photo, photo)
+        sheet['F1'] = 'Y'
 
 # Function to search Excel to see if the tweet already exists in the database
-def search_log(tweetID):
+def search_log(sheet, tweetID):
     pass
 
 
