@@ -2,13 +2,11 @@ import twitKeys as tk
 import tweepy
 import re
 import openpyxl
+import pandas as pd
 import sys
-import logging
 
 
 def main():
-    logging.basicConfig(level=logging.INFO,
-                        format=' %(asctime)s - %(levelname)s - %(message)s')
 
     # Authorizing the app with the twitter dev app API keys
     auth = tweepy.OAuthHandler(tk.API_KEY, tk.API_SECRET)
@@ -19,9 +17,7 @@ def main():
     tweetAuthorRE = re.compile(r'\'([\d\w]+)\'')
     tweetLinkRE = re.compile(r'.*(https://t.co/[\w\d]*)')
 
-    # Excel file for storing and comparing tweet data
-    wb = openpyxl.load_workbook('twitLog.xlsx')
-    sheet = wb.active
+    # Excel database for storing and comparing tweet data
 
     # Counter for number of procesesed tweets
     tweetCount = 0
@@ -35,8 +31,12 @@ def main():
         print('Missing command line args')
         return
 
+    db = pd.read_excel('twitDB.xlsx', dtype={'tweetID': str})
+
+    rowsAppend = []
+
     # Using cursor, return a generator of 1 million of the user's favorited tweets
-    for favorite in tweepy.Cursor(api.favorites, id=User).items(50):
+    for favorite in tweepy.Cursor(api.favorites, id=User).items(1000000):
 
         # Counter for number of tweets processed
         tweetCount += 1
@@ -65,7 +65,7 @@ def main():
                 author = authorRAW
 
             tweetID = str(favorite.id)
-            tweetDate = f'{favorite.created_at.year}-{favorite.created_at.month}-{favorite.created_at.day}'
+            date = f'{favorite.created_at.year}-{favorite.created_at.month}-{favorite.created_at.day}'
 
             photos = []
 
@@ -74,55 +74,42 @@ def main():
                     # Prints direct link of images within the tweet
                     photos.append(medium['media_url'])
 
-            # If the tweet has not been logged, process it and reset the counter
-            if not search_log(sheet, tweetID):
-                write_log(sheet, tweetID, author, tweetDate, tweetLink, photos)
+            # If the tweet is not in the database, process it and reset the counter
+            if not search_db(db, tweetID):
+                write_db(rowsAppend, tweetID, author, date, tweetLink, photos)
                 prevLoggedCount = 0
 
-            # If it has been logged, increment the counter
+            # If it is in the database, increment the counter
             else:
                 prevLoggedCount += 1
 
-            # If there were 20 previously liked posts in a row, stop processing
+            # If there were 20 previously logged posts in a row, stop processing
             if prevLoggedCount > 20:
                 break
 
             # Prints tweet information
-            logging.info(f'Number: {tweetCount}')
-            logging.info(f'Counter: {prevLoggedCount}')
-            logging.info(f'Author: {author}')
-            logging.info(f'ID: {tweetID}')
-            logging.info(f'Link: {tweetLink}')
-            logging.info(f'Date: {tweetDate}')
-            for photo in photos:
-                logging.info(f'Image: {photo}')
 
 
-    wb.save('twitLog.xlsx')
-    wb.close()
+    db = db.append(rowsAppend)
+    db.sort_values(by=['tweetID'])
+    print(db.head(1000000))
+
+    db.to_excel('twitDB.xlsx', index=False)
+
 
 # Function to populate the excel file with twitter data from new tweets
-
-
-def write_log(sheet, tweetID, author, tweetDate, tweetLink, photos):
+def write_db(rowsAppend, tweetID, author, date, tweetLink, photos):
     count = 0
-    for photo in photos:
+    for imageLink in photos:
         count += 1
-        sheet.insert_rows(1)
-        sheet['A1'] = tweetID
-        sheet['B1'] = author
-        sheet['C1'] = tweetDate
-        sheet['D1'] = '=HYPERLINK("{}", "{}")'.format(tweetLink, tweetLink)
-        sheet['E1'] = '=HYPERLINK("{}", "{}")'.format(photo, photo)
-        sheet['F1'] = count
+        rowsAppend.append({'tweetID': tweetID, 'author': author, 'date': date,
+                           'link': tweetLink, 'imageLink': imageLink, 'count': count})
 
 
 # Function to search Excel to see if the tweet already exists in the database
-def search_log(sheet, tweetID):
-    for row in sheet.iter_rows(min_row=1, max_col=1):
-        if tweetID == row[0].value:
-            return True
-    return False
+def search_db(db, tweetID):
+    return tweetID in set(db["tweetID"])
+
 
 if __name__ == "__main__":
     main()
