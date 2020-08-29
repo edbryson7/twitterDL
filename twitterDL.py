@@ -28,14 +28,13 @@ def main():
     # Counter for how many tweets in a row were previously logged
     prevLoggedCount = 0
 
-    # Create a list of all existing tweet IDs
-    tweetIDList = []
-    for cell in list(sheet.columns)[0]:
-        if cell.value is None:
-            break
-        tweetIDList.append(cell.value)
+    # Take the username of the account to be processed
+    try:
+        User = sys.argv[1]
+    except:
+        print('Missing command line args')
+        return
 
-    User = sys.argv[1]
     # Using cursor, return a generator of 1 million of the user's favorited tweets
     for favorite in tweepy.Cursor(api.favorites, id=User).items(50):
 
@@ -76,7 +75,7 @@ def main():
                     photos.append(medium['media_url'])
 
             # If the tweet has not been logged, process it and reset the counter
-            if not search_log(tweetIDList, tweetID):
+            if not search_log(sheet, tweetID):
                 write_log(sheet, tweetID, author, tweetDate, tweetLink, photos)
                 prevLoggedCount = 0
 
@@ -117,12 +116,13 @@ def write_log(sheet, tweetID, author, tweetDate, tweetLink, photos):
         sheet['E1'] = '=HYPERLINK("{}", "{}")'.format(photo, photo)
         sheet['F1'] = count
 
+
 # Function to search Excel to see if the tweet already exists in the database
-
-
-def search_log(tweetIDList, tweetID):
-    return tweetID in tweetIDList
-
+def search_log(sheet, tweetID):
+    for row in sheet.iter_rows(min_row=1, max_col=1):
+        if tweetID == row[0].value:
+            return True
+    return False
 
 if __name__ == "__main__":
     main()
